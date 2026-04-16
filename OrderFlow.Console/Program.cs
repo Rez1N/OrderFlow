@@ -216,12 +216,13 @@ Console.WriteLine();
 PrintHeader("Projekt OrderFlow - koniec demonstracji Lab 1");
 
 // ============================================================================
-// LAB 2 — zadania 1–2
+// LAB 2 — zadania 1–3
 // ============================================================================
 Lab2Task1Events.Run();
 await Lab2Task2Async.RunAsync(products, customers);
+Lab2Task3Statistics.Run();
 
-PrintHeader("Projekt OrderFlow - Lab 2 zadania 1–2 (zdarzenia + async) — koniec");
+PrintHeader("Projekt OrderFlow - koniec (Lab 1 + Lab 2: zdarzenia, async, thread safety)");
 
 // ============================================================================
 // FUNKCJE POMOCNICZE
