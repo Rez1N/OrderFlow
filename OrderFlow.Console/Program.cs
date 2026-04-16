@@ -1,3 +1,4 @@
+using OrderFlow.Console.Lab2;
 using OrderFlow.Console.Models;
 using OrderFlow.Console.Services;
 
@@ -212,7 +213,14 @@ foreach (var item in q6)
         $"ulub. kategoria: {item.FavoriteCategory}");
 
 Console.WriteLine();
-PrintHeader("Projekt OrderFlow - koniec demonstracji");
+PrintHeader("Projekt OrderFlow - koniec demonstracji Lab 1");
+
+// ============================================================================
+// LAB 2 — zadanie 1 (kolejne zadania w osobnych commitach)
+// ============================================================================
+Lab2Task1Events.Run();
+
+PrintHeader("Projekt OrderFlow - Lab 2 zadanie 1 (zdarzenia) — koniec");
 
 // ============================================================================
 // FUNKCJE POMOCNICZE

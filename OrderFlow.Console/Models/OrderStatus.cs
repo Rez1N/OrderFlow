@@ -9,5 +9,7 @@ public enum OrderStatus
     Validated = 2,
     Processing = 3,
     Completed = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    /// <summary>Lab 2: zamówienie odrzucone po walidacji pipeline.</summary>
+    Failed = 6
 }
