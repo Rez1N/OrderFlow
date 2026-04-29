@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using System.Xml.Serialization;
+
 namespace OrderFlow.Console.Models;
 
 /// <summary>
@@ -5,12 +8,28 @@ namespace OrderFlow.Console.Models;
 /// </summary>
 public class Order
 {
+    [XmlAttribute("id")]
     public int Id { get; set; }
+
+    [XmlAttribute("customerId")]
     public int CustomerId { get; set; }
+
+    [JsonIgnore]
+    [XmlIgnore]
     public Customer Customer { get; set; }
+
+    [XmlElement("orderDate")]
     public DateTime OrderDate { get; set; }
+
+    [XmlAttribute("status")]
     public OrderStatus Status { get; set; }
+
+    [XmlArray("items")]
+    [XmlArrayItem("item")]
     public List<OrderItem> Items { get; set; } = new();
+
+    [JsonPropertyName("internalNotes")]
+    [XmlElement("notes_text")]
     public string Notes { get; set; }
 
     /// <summary>

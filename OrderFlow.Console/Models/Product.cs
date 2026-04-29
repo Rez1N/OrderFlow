@@ -1,3 +1,5 @@
+using System.Xml.Serialization;
+
 namespace OrderFlow.Console.Models;
 
 /// <summary>
@@ -5,11 +7,22 @@ namespace OrderFlow.Console.Models;
 /// </summary>
 public class Product
 {
+    [XmlAttribute("id")]
     public int Id { get; set; }
+
+    [XmlElement("name")]
     public string Name { get; set; }
+
+    [XmlElement("category")]
     public string Category { get; set; }
+
+    [XmlElement("price")]
     public decimal Price { get; set; }
+
+    [XmlElement("stock")]
     public int StockQuantity { get; set; }
+
+    [XmlIgnore]
     public string Description { get; set; }
 
     public override string ToString() =>

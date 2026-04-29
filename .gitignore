@@ -40,3 +40,6 @@ Thumbs.db
 
 # Local scratch (split commits)
 _lab2_staging/
+data/
+inbox/
+*.tmp

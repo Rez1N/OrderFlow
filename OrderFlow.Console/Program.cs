@@ -1,6 +1,8 @@
 using OrderFlow.Console.Lab2;
 using OrderFlow.Console.Models;
+using OrderFlow.Console.Persistence;
 using OrderFlow.Console.Services;
+using OrderFlow.Console.Watchers;
 
 var products = SampleData.GetProducts();
 var customers = SampleData.GetCustomers();
@@ -222,6 +224,67 @@ Lab2Task1Events.Run();
 await Lab2Task2Async.RunAsync(products, customers);
 Lab2Task3Statistics.Run();
 
+// ============================================================================
+// LAB 3 — persystencja + XML report + monitoring inbox
+// ============================================================================
+PrintHeader("LAB 3 - Persystencja i monitoring plików");
+
+var repository = new OrderRepository();
+var reportBuilder = new XmlReportBuilder();
+var dataPath = Path.Combine(AppContext.BaseDirectory, "data");
+var inboxPath = Path.Combine(AppContext.BaseDirectory, "inbox");
+var jsonPath = Path.Combine(dataPath, "orders.json");
+var xmlPath = Path.Combine(dataPath, "orders.xml");
+var reportPath = Path.Combine(dataPath, "report.xml");
+
+// Zadanie 1: round-trip JSON/XML
+Console.WriteLine("\n--- Lab 3 / Zadanie 1: OrderRepository round-trip ---");
+await repository.SaveToJsonAsync(orders, jsonPath);
+await repository.SaveToXmlAsync(orders, xmlPath);
+var fromJson = await repository.LoadFromJsonAsync(jsonPath);
+var fromXml = await repository.LoadFromXmlAsync(xmlPath);
+Console.WriteLine($"JSON -> count={fromJson.Count}, total={fromJson.Sum(o => o.TotalAmount):0.00}");
+Console.WriteLine($"XML  -> count={fromXml.Count}, total={fromXml.Sum(o => o.TotalAmount):0.00}");
+
+// Re-link customers for loaded data used in report and watcher demo.
+RebindCustomers(fromJson, customers);
+RebindCustomers(fromXml, customers);
+
+// Zadanie 2: XML report + query from report file
+Console.WriteLine("\n--- Lab 3 / Zadanie 2: XmlReportBuilder ---");
+var xmlReport = reportBuilder.BuildReport(fromJson);
+await reportBuilder.SaveReportAsync(xmlReport, reportPath);
+Console.WriteLine($"Report saved: {reportPath}");
+var highValueIds = await reportBuilder.FindHighValueOrderIdsAsync(reportPath, 1000m);
+Console.WriteLine("Order IDs > 1000.00 from report:");
+foreach (var id in highValueIds)
+    Console.WriteLine($"  - {id}");
+
+// Zadanie 3: watcher + auto-import demo
+Console.WriteLine("\n--- Lab 3 / Zadanie 3: InboxWatcher ---");
+var watcherPipeline = new OrderPipeline();
+watcherPipeline.StatusChanged += (sender, args) =>
+{
+    Console.WriteLine(
+        $"[WATCHER-PIPELINE] {args.Timestamp:O} | Order {args.Order.Id} | {args.OldStatus} -> {args.NewStatus}");
+};
+
+using (var watcher = new InboxWatcher(inboxPath, watcherPipeline, maxConcurrentFiles: 2))
+{
+    watcher.Start();
+    for (var i = 1; i <= 2; i++)
+    {
+        var batch = BuildInboxOrders(products, customers, i);
+        var filePath = Path.Combine(inboxPath, $"incoming-{DateTime.Now:yyyyMMdd-HHmmss}-{i}.json");
+        await repository.SaveToJsonAsync(batch, filePath);
+        Console.WriteLine($"[DEMO] Generated file: {filePath}");
+        await Task.Delay(TimeSpan.FromSeconds(3));
+    }
+
+    Console.WriteLine("Watcher active for 5 more seconds...");
+    await Task.Delay(TimeSpan.FromSeconds(5));
+}
+
 PrintHeader("Projekt OrderFlow - koniec (Lab 1 + Lab 2: zdarzenia, async, thread safety)");
 
 // ============================================================================
@@ -233,4 +296,47 @@ void PrintHeader(string title)
     Console.WriteLine("\n" + new string('=', 70));
     Console.WriteLine(title.PadRight(70));
     Console.WriteLine(new string('=', 70));
+}
+
+static void RebindCustomers(List<Order> loadedOrders, List<Customer> customerCatalog)
+{
+    foreach (var order in loadedOrders)
+        order.Customer = customerCatalog.FirstOrDefault(c => c.Id == order.CustomerId) ?? customerCatalog.First();
+}
+
+static List<Order> BuildInboxOrders(List<Product> products, List<Customer> customers, int batchNo)
+{
+    var baseOrderId = 10_000 + (batchNo * 100);
+    var seedOrder = SampleData.GetOrders(products, customers).First();
+
+    var result = new List<Order>();
+    for (var i = 0; i < 3; i++)
+    {
+        var orderId = baseOrderId + i;
+        var customer = customers[(batchNo + i) % customers.Count];
+        var product = products[(batchNo + i) % products.Count];
+        result.Add(new Order
+        {
+            Id = orderId,
+            CustomerId = customer.Id,
+            Customer = customer,
+            OrderDate = DateTime.Now,
+            Status = OrderStatus.New,
+            Notes = $"Inbox batch {batchNo}, order {i + 1}",
+            Items = new List<OrderItem>
+            {
+                new OrderItem
+                {
+                    Id = seedOrder.Items.First().Id + orderId,
+                    OrderId = orderId,
+                    ProductId = product.Id,
+                    Product = product,
+                    Quantity = i + 1,
+                    UnitPrice = product.Price
+                }
+            }
+        });
+    }
+
+    return result;
 }

@@ -28,6 +28,12 @@ public class OrderPipeline
         SetStatus(order, OrderStatus.Completed);
     }
 
+    public Task ProcessOrderAsync(Order order)
+    {
+        ProcessOrder(order);
+        return Task.CompletedTask;
+    }
+
     private static List<string> Validate(Order order)
     {
         var errors = new List<string>();
