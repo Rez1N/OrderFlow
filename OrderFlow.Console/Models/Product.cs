@@ -25,6 +25,8 @@ public class Product
     [XmlIgnore]
     public string Description { get; set; }
 
+    public List<OrderItem> OrderItems { get; set; } = new();
+
     public override string ToString() =>
         $"[{Id}] {Name} ({Category}) - {Price}zł (Stock: {StockQuantity})";
 }

@@ -122,7 +122,7 @@ public static class OrderProcessorExtensions
         return order => new
         {
             OrderId = order.Id,
-            CustomerName = order.Customer?.Name,
+            CustomerName = order.Customer?.FullName,
             Total = order.TotalAmount,
             ItemCount = order.Items.Count,
             Status = order.Status.ToString()
@@ -134,7 +134,7 @@ public static class OrderProcessorExtensions
     /// </summary>
     public static Func<Order, string> ProjectToOrderInfo()
     {
-        return order => $"Order#{order.Id}: {order.Customer?.Name} - {order.TotalAmount}zł ({order.Status})";
+        return order => $"Order#{order.Id}: {order.Customer?.FullName} - {order.TotalAmount}zł ({order.Status})";
     }
 
     /// <summary>

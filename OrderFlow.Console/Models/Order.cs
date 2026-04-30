@@ -30,7 +30,7 @@ public class Order
 
     [JsonPropertyName("internalNotes")]
     [XmlElement("notes_text")]
-    public string Notes { get; set; }
+    public string? Notes { get; set; }
 
     /// <summary>
     /// Kwota całkowita zamówienia (suma TotalPrice wszystkich pozycji)
@@ -38,6 +38,6 @@ public class Order
     public decimal TotalAmount => Items.Sum(item => item.TotalPrice);
 
     public override string ToString() =>
-        $"Order #{Id} ({Status}) - {Customer?.Name} - {OrderDate:yyyy-MM-dd} - {TotalAmount}zł\n" +
+        $"Order #{Id} ({Status}) - {Customer?.FullName} - {OrderDate:yyyy-MM-dd} - {TotalAmount}zł\n" +
         string.Join("\n", Items);
 }

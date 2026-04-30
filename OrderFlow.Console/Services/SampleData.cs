@@ -67,7 +67,7 @@ public static class SampleData
         new Customer
         {
             Id = 1,
-            Name = "Jan Kowalski",
+            FullName = "Jan Kowalski",
             Email = "jan.kowalski@email.com",
             City = "Warszawa",
             Country = "Polska",
@@ -76,7 +76,7 @@ public static class SampleData
         new Customer
         {
             Id = 2,
-            Name = "Maria Lewandowska",
+            FullName = "Maria Lewandowska",
             Email = "maria.lewandowska@email.com",
             City = "Kraków",
             Country = "Polska",
@@ -85,7 +85,7 @@ public static class SampleData
         new Customer
         {
             Id = 3,
-            Name = "Piotr Nowak",
+            FullName = "Piotr Nowak",
             Email = "piotr.nowak@email.com",
             City = "Wrocław",
             Country = "Polska",
@@ -94,7 +94,7 @@ public static class SampleData
         new Customer
         {
             Id = 4,
-            Name = "Anna Zielińska",
+            FullName = "Anna Zielińska",
             Email = "anna.zielinska@email.com",
             City = "Gdańsk",
             Country = "Polska",

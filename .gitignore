@@ -43,3 +43,8 @@ _lab2_staging/
 data/
 inbox/
 *.tmp
+
+# SQLite database (Lab 4)
+orderflow.db
+**/orderflow.db
+*.db

@@ -18,7 +18,7 @@ public sealed class XmlReportBuilder
                 new XAttribute("revenue", g.Sum(o => o.TotalAmount).ToString("0.00", CultureInfo.InvariantCulture))));
 
         var byCustomer = orderList
-            .GroupBy(o => new { o.CustomerId, Name = o.Customer?.Name ?? $"Customer-{o.CustomerId}", IsVip = o.Customer?.IsVip ?? false })
+            .GroupBy(o => new { o.CustomerId, Name = o.Customer?.FullName ?? $"Customer-{o.CustomerId}", IsVip = o.Customer?.IsVip ?? false })
             .OrderBy(g => g.Key.Name)
             .Select(g => new XElement("customer",
                 new XAttribute("id", g.Key.CustomerId),

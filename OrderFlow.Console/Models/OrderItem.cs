@@ -14,6 +14,9 @@ public class OrderItem
     [XmlAttribute("productId")]
     public int ProductId { get; set; }
 
+    [XmlIgnore]
+    public Order Order { get; set; }
+
     [XmlElement("product")]
     public Product Product { get; set; }
 

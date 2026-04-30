@@ -52,15 +52,15 @@ Console.WriteLine("\n--- Filtry Predicate (3 różne) ---");
 
 var completedOrders = processor.FilterOrders(orders, OrderProcessorExtensions.ByStatus(OrderStatus.Completed));
 Console.WriteLine($"\n1. Zamówienia skompletowane ({completedOrders.Count}):");
-completedOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.Name} - {o.TotalAmount}zł"));
+completedOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł"));
 
 var vipOrders = processor.FilterOrders(orders, OrderProcessorExtensions.FromVipCustomers());
 Console.WriteLine($"\n2. Zamówienia od VIP klientów ({vipOrders.Count}):");
-vipOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.Name} - {o.TotalAmount}zł"));
+vipOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł"));
 
 var largeOrders = processor.FilterOrders(orders, OrderProcessorExtensions.LargeOrders());
 Console.WriteLine($"\n3. Duże zamówienia (>5000zł) ({largeOrders.Count}):");
-largeOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.Name} - {o.TotalAmount}zł"));
+largeOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł"));
 
 // 2. ACTION - Wykonywanie akcji
 Console.WriteLine("\n--- Akcje Action (2 zastosowania) ---");
@@ -99,7 +99,7 @@ processor.FilterSortAndExecute(
     o => o.TotalAmount > 1000m,
     o => o.TotalAmount,
     2,
-    o => Console.WriteLine($"  #{o.Id}: {o.Customer?.Name} - {o.TotalAmount}zł")
+    o => Console.WriteLine($"  #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł")
 );
 
 // Przywracamy oryginalne statusy
@@ -118,7 +118,7 @@ var q1 = orders
     .GroupBy(o => o.Customer)
     .Select(g => new
     {
-        Customer = g.Key.Name,
+        Customer = g.Key.FullName,
         OrderCount = g.Count(),
         TotalAmount = g.Sum(o => o.TotalAmount),
         AverageOrder = g.Average(o => o.TotalAmount)
@@ -178,7 +178,7 @@ var q5 = customers
         order => order.CustomerId,
         (customer, customerOrders) => new
         {
-            CustomerName = customer.Name,
+            CustomerName = customer.FullName,
             IsVip = customer.IsVip,
             OrderCount = customerOrders.Count(),
             TotalSpent = customerOrders.Sum(o => o.TotalAmount)
@@ -201,7 +201,7 @@ var q6 = from customer in customers
              .FirstOrDefault() ?? "Brak"
          select new
          {
-             Customer = customer.Name,
+             Customer = customer.FullName,
              OrderCount = customerOrders.Count(),
              TotalAmount = customerOrders.Sum(o => o.TotalAmount),
              FavoriteCategory = favoriteCategory
