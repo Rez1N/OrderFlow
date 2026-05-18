@@ -1,9 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using OrderFlow.Console.Lab2;
 using OrderFlow.Console.Models;
 using OrderFlow.Console.Persistence;
 using OrderFlow.Console.Services;
 using OrderFlow.Console.Watchers;
-using Microsoft.EntityFrameworkCore;
 
 var products = SampleData.GetProducts();
 var customers = SampleData.GetCustomers();
@@ -29,13 +29,11 @@ PrintHeader("ZADANIE 2 - Delegaty i walidacja zamówień");
 
 var validator = OrderValidator.CreateWithDefaults();
 
-// Test walidacji zamówienia poprawnego
 Console.WriteLine("\n--- Walidacja zamówienia POPRAWNEGO (ID=1) ---");
 var validOrder = orders.First(o => o.Id == 1);
 var result = validator.ValidateAll(validOrder);
 Console.WriteLine(result);
 
-// Test walidacji zamówienia łamiącego kilka reguł
 Console.WriteLine("\n--- Walidacja zamówienia BŁĘDNEGO (ID=6 - z przyszłości) ---");
 var invalidOrder = orders.First(o => o.Id == 6);
 result = validator.ValidateAll(invalidOrder);
@@ -48,7 +46,6 @@ PrintHeader("ZADANIE 3 - Action, Func, Predicate");
 
 var processor = new OrderProcessor();
 
-// 1. PREDICATE - Filtrowanie zamówień
 Console.WriteLine("\n--- Filtry Predicate (3 różne) ---");
 
 var completedOrders = processor.FilterOrders(orders, OrderProcessorExtensions.ByStatus(OrderStatus.Completed));
@@ -63,7 +60,6 @@ var largeOrders = processor.FilterOrders(orders, OrderProcessorExtensions.LargeO
 Console.WriteLine($"\n3. Duże zamówienia (>5000zł) ({largeOrders.Count}):");
 largeOrders.ForEach(o => Console.WriteLine($"  - #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł"));
 
-// 2. ACTION - Wykonywanie akcji
 Console.WriteLine("\n--- Akcje Action (2 zastosowania) ---");
 
 Console.WriteLine("\n1. Wypisywanie zamówień z statusem 'Processing':");
@@ -78,23 +74,17 @@ processor.ExecuteAction(testOrders, OrderProcessorExtensions.ChangeStatus(OrderS
 Console.WriteLine("  Po zmianie:");
 testOrders.ForEach(o => Console.WriteLine($"    #{o.Id}: {o.Status}"));
 
-// 3. FUNC - Projekcja zamówień
 Console.WriteLine("\n--- Projekcja Func na typ anonimowy ---");
 var summaries = processor.ProjectOrders(orders.Take(3).ToList(), OrderProcessorExtensions.ProjectToOrderSummary());
 foreach (var summary in summaries)
-{
     Console.WriteLine($"  {summary}");
-}
 
-// 4. AGREGACJA - Func<IEnumerable<Order>, decimal>
 Console.WriteLine("\n--- Agregacja (3 agregatory) ---");
 Console.WriteLine($"1. Suma kwot: {processor.Aggregate(orders, OrderProcessorExtensions.SumTotal()):C}");
 Console.WriteLine($"2. Średnia kwota: {processor.Aggregate(orders, OrderProcessorExtensions.AverageTotal()):C}");
 Console.WriteLine($"3. Maksymalna kwota: {processor.Aggregate(orders, OrderProcessorExtensions.MaxTotal()):C}");
 
-// 5. ŁAŃCUCH - Filtruj → Sortuj → Top N → Wypisz
 Console.WriteLine("\n--- Łańcuch operacji: filtruj → sortuj → top 2 → wypisz ---");
-Console.WriteLine("2 największe zamówienia od klientów (po filtracji):");
 processor.FilterSortAndExecute(
     orders,
     o => o.TotalAmount > 1000m,
@@ -103,24 +93,21 @@ processor.FilterSortAndExecute(
     o => Console.WriteLine($"  #{o.Id}: {o.Customer?.FullName} - {o.TotalAmount}zł")
 );
 
-// Przywracamy oryginalne statusy
 testOrders[0].Status = OrderStatus.Validated;
 testOrders[1].Status = OrderStatus.New;
 
 // ============================================================================
-// ZADANIE 4 - LINQ (method syntax i query syntax)
+// ZADANIE 4 - LINQ
 // ============================================================================
 PrintHeader("ZADANIE 4 - LINQ");
 
-// ZAPYTANIE 1: GroupBy z agregacją - Top klienci wg kwoty
 Console.WriteLine("\n--- Q1: GroupBy + agregacja (Method Syntax) ---");
-Console.WriteLine("Top klienci wg całkowitej kwoty zamówień:");
 var q1 = orders
     .GroupBy(o => o.Customer)
     .Select(g => new
     {
-        Customer = g.Key.FullName,
-        OrderCount = g.Count(),
+        Customer    = g.Key.FullName,
+        OrderCount  = g.Count(),
         TotalAmount = g.Sum(o => o.TotalAmount),
         AverageOrder = g.Average(o => o.TotalAmount)
     })
@@ -129,69 +116,51 @@ var q1 = orders
 foreach (var item in q1)
     Console.WriteLine($"  {item.Customer}: {item.OrderCount} zamówień, razem {item.TotalAmount}zł (śr. {item.AverageOrder:F0}zł)");
 
-// ZAPYTANIE 2: Join - Zamówienia z klientami, grupowanie po mieście
 Console.WriteLine("\n--- Q2: Join (Query Syntax) ---");
-Console.WriteLine("Zamówienia zgrupowane po mieście klienta:");
 var q2 = from order in orders
          join customer in customers on order.CustomerId equals customer.Id
          group new { order, customer } by customer.City into cityGroup
          select new
          {
-             City = cityGroup.Key,
-             OrderCount = cityGroup.Count(),
+             City        = cityGroup.Key,
+             OrderCount  = cityGroup.Count(),
              TotalAmount = cityGroup.Sum(x => x.order.TotalAmount)
          };
 foreach (var item in q2.OrderByDescending(x => x.TotalAmount))
     Console.WriteLine($"  {item.City}: {item.OrderCount} zamówień, {item.TotalAmount}zł");
 
-// ZAPYTANIE 3: SelectMany (spłaszczenie) - Order → OrderItems → Products
 Console.WriteLine("\n--- Q3: SelectMany (Method Syntax) ---");
-Console.WriteLine("Produkty We wszystkich zamówieniach:");
-var q3 = orders
-    .SelectMany(o => o.Items)
-    .Select(i => i.Product)
-    .Distinct()
-    .OrderBy(p => p.Name);
+var q3 = orders.SelectMany(o => o.Items).Select(i => i.Product).Distinct().OrderBy(p => p.Name);
 foreach (var product in q3)
     Console.WriteLine($"  {product.Name} ({product.Category})");
 
-// ZAPYTANIE 4: GroupBy agregacja - Średnia wartość per kategoria
 Console.WriteLine("\n--- Q4: GroupBy (Query Syntax) ---");
-Console.WriteLine("Średnia wartość produktu per kategoria:");
 var q4 = from product in products
          group product by product.Category into catGroup
          select new
          {
-             Category = catGroup.Key,
+             Category     = catGroup.Key,
              ProductCount = catGroup.Count(),
-             AvgPrice = catGroup.Average(p => p.Price)
+             AvgPrice     = catGroup.Average(p => p.Price)
          };
 foreach (var item in q4.OrderByDescending(x => x.AvgPrice))
     Console.WriteLine($"  {item.Category}: {item.ProductCount} produktów, śr. cena {item.AvgPrice:F2}zł");
 
-// ZAPYTANIE 5: GroupJoin (Left Join pattern)
 Console.WriteLine("\n--- Q5: GroupJoin (Method Syntax - Left Join Pattern) ---");
-Console.WriteLine("Wszyscy klienci i ich zamówienia:");
 var q5 = customers
-    .GroupJoin(
-        orders,
-        customer => customer.Id,
-        order => order.CustomerId,
+    .GroupJoin(orders, customer => customer.Id, order => order.CustomerId,
         (customer, customerOrders) => new
         {
             CustomerName = customer.FullName,
-            IsVip = customer.IsVip,
-            OrderCount = customerOrders.Count(),
-            TotalSpent = customerOrders.Sum(o => o.TotalAmount)
-        }
-    )
+            IsVip        = customer.IsVip,
+            OrderCount   = customerOrders.Count(),
+            TotalSpent   = customerOrders.Sum(o => o.TotalAmount)
+        })
     .OrderByDescending(x => x.TotalSpent);
 foreach (var item in q5)
-    Console.WriteLine($"  {item.CustomerName} {(item.IsVip ? "[VIP]" : "")}: " +
-        $"{item.OrderCount} zamówień, razem {item.TotalSpent:F0}zł");
+    Console.WriteLine($"  {item.CustomerName} {(item.IsVip ? "[VIP]" : "")}: {item.OrderCount} zamówień, razem {item.TotalSpent:F0}zł");
 
-// ZAPYTANIE 6: Mieszana składnia - Raport per klient z ulubioną kategorią
-Console.WriteLine("\n--- Q6: Mixed Syntax - Raport per klient z ulubioną kategorią ---");
+Console.WriteLine("\n--- Q6: Mixed Syntax ---");
 var q6 = from customer in customers
          let customerOrders = orders.Where(o => o.CustomerId == customer.Id)
          let favoriteCategory = customerOrders
@@ -202,56 +171,50 @@ var q6 = from customer in customers
              .FirstOrDefault() ?? "Brak"
          select new
          {
-             Customer = customer.FullName,
-             OrderCount = customerOrders.Count(),
-             TotalAmount = customerOrders.Sum(o => o.TotalAmount),
+             Customer         = customer.FullName,
+             OrderCount       = customerOrders.Count(),
+             TotalAmount      = customerOrders.Sum(o => o.TotalAmount),
              FavoriteCategory = favoriteCategory
-         }
-         into report
+         } into report
          orderby report.TotalAmount descending
          select report;
-
 foreach (var item in q6)
-    Console.WriteLine($"  {item.Customer}: {item.OrderCount} zamówień, {item.TotalAmount}zł, " +
-        $"ulub. kategoria: {item.FavoriteCategory}");
+    Console.WriteLine($"  {item.Customer}: {item.OrderCount} zamówień, {item.TotalAmount}zł, ulub. kategoria: {item.FavoriteCategory}");
 
 Console.WriteLine();
 PrintHeader("Projekt OrderFlow - koniec demonstracji Lab 1");
 
 // ============================================================================
-// LAB 2 — zadania 1–3
+// LAB 2
 // ============================================================================
 Lab2Task1Events.Run();
 await Lab2Task2Async.RunAsync(products, customers);
 Lab2Task3Statistics.Run();
 
 // ============================================================================
-// LAB 3 — persystencja + XML report + monitoring inbox
+// LAB 3
 // ============================================================================
 PrintHeader("LAB 3 - Persystencja i monitoring plików");
 
-var repository = new OrderRepository();
+var repository   = new OrderRepository();
 var reportBuilder = new XmlReportBuilder();
-var dataPath = Path.Combine(AppContext.BaseDirectory, "data");
-var inboxPath = Path.Combine(AppContext.BaseDirectory, "inbox");
-var jsonPath = Path.Combine(dataPath, "orders.json");
-var xmlPath = Path.Combine(dataPath, "orders.xml");
-var reportPath = Path.Combine(dataPath, "report.xml");
+var dataPath     = Path.Combine(AppContext.BaseDirectory, "data");
+var inboxPath    = Path.Combine(AppContext.BaseDirectory, "inbox");
+var jsonPath     = Path.Combine(dataPath, "orders.json");
+var xmlPath      = Path.Combine(dataPath, "orders.xml");
+var reportPath   = Path.Combine(dataPath, "report.xml");
 
-// Zadanie 1: round-trip JSON/XML
 Console.WriteLine("\n--- Lab 3 / Zadanie 1: OrderRepository round-trip ---");
 await repository.SaveToJsonAsync(orders, jsonPath);
 await repository.SaveToXmlAsync(orders, xmlPath);
 var fromJson = await repository.LoadFromJsonAsync(jsonPath);
-var fromXml = await repository.LoadFromXmlAsync(xmlPath);
+var fromXml  = await repository.LoadFromXmlAsync(xmlPath);
 Console.WriteLine($"JSON -> count={fromJson.Count}, total={fromJson.Sum(o => o.TotalAmount):0.00}");
 Console.WriteLine($"XML  -> count={fromXml.Count}, total={fromXml.Sum(o => o.TotalAmount):0.00}");
 
-// Re-link customers for loaded data used in report and watcher demo.
 RebindCustomers(fromJson, customers);
 RebindCustomers(fromXml, customers);
 
-// Zadanie 2: XML report + query from report file
 Console.WriteLine("\n--- Lab 3 / Zadanie 2: XmlReportBuilder ---");
 var xmlReport = reportBuilder.BuildReport(fromJson);
 await reportBuilder.SaveReportAsync(xmlReport, reportPath);
@@ -261,32 +224,233 @@ Console.WriteLine("Order IDs > 1000.00 from report:");
 foreach (var id in highValueIds)
     Console.WriteLine($"  - {id}");
 
-// Zadanie 3: watcher + auto-import demo
 Console.WriteLine("\n--- Lab 3 / Zadanie 3: InboxWatcher ---");
 var watcherPipeline = new OrderPipeline();
 watcherPipeline.StatusChanged += (sender, args) =>
-{
-    Console.WriteLine(
-        $"[WATCHER-PIPELINE] {args.Timestamp:O} | Order {args.Order.Id} | {args.OldStatus} -> {args.NewStatus}");
-};
+    Console.WriteLine($"[WATCHER-PIPELINE] {args.Timestamp:O} | Order {args.Order.Id} | {args.OldStatus} -> {args.NewStatus}");
 
 using (var watcher = new InboxWatcher(inboxPath, watcherPipeline, maxConcurrentFiles: 2))
 {
     watcher.Start();
     for (var i = 1; i <= 2; i++)
     {
-        var batch = BuildInboxOrders(products, customers, i);
+        var batch    = BuildInboxOrders(products, customers, i);
         var filePath = Path.Combine(inboxPath, $"incoming-{DateTime.Now:yyyyMMdd-HHmmss}-{i}.json");
         await repository.SaveToJsonAsync(batch, filePath);
         Console.WriteLine($"[DEMO] Generated file: {filePath}");
         await Task.Delay(TimeSpan.FromSeconds(3));
     }
-
     Console.WriteLine("Watcher active for 5 more seconds...");
     await Task.Delay(TimeSpan.FromSeconds(5));
 }
 
-PrintHeader("Projekt OrderFlow - koniec (Lab 1 + Lab 2: zdarzenia, async, thread safety)");
+// ============================================================================
+// LAB 4 — EF Core
+// ============================================================================
+PrintHeader("LAB 4 - Baza danych w OrderFlow (EF Core + SQLite)");
+
+await using var db = new OrderFlowContext();
+await db.Database.MigrateAsync();
+await DatabaseSeeder.SeedAsync(db);
+
+PrintHeader("LAB 4 / Zadanie 2 — CRUD");
+
+Console.WriteLine("\n--- CREATE: Nowe zamówienie z 2 pozycjami ---");
+var firstCustomer = await db.Customers.FirstAsync();
+var firstProduct  = await db.Products.FirstAsync();
+var secondProduct = await db.Products.Skip(1).FirstAsync();
+
+var newOrder = new Order
+{
+    CustomerId = firstCustomer.Id,
+    OrderDate  = DateTime.Now,
+    Status     = OrderStatus.New,
+    Notes      = "Zamówienie testowe z Lab 4",
+    Items      =
+    [
+        new OrderItem { ProductId = firstProduct.Id,  Quantity = 1, UnitPrice = firstProduct.Price  },
+        new OrderItem { ProductId = secondProduct.Id, Quantity = 2, UnitPrice = secondProduct.Price },
+    ]
+};
+db.Orders.Add(newOrder);
+await db.SaveChangesAsync();
+Console.WriteLine($"Dodano zamówienie #{newOrder.Id} z 2 pozycjami dla klienta '{firstCustomer.FullName}'");
+
+Console.WriteLine("\n--- READ: Zamówienia z Include ---");
+var ordersFromDb = await db.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items).ThenInclude(i => i.Product)
+    .OrderBy(o => o.Id)
+    .ToListAsync();
+foreach (var o in ordersFromDb)
+{
+    var total = o.Items.Sum(i => i.Quantity * i.UnitPrice);
+    Console.WriteLine($"  #{o.Id} [{o.Status}] | {o.Customer.FullName} | {o.OrderDate:yyyy-MM-dd} | {total:F2} zł");
+    foreach (var item in o.Items)
+        Console.WriteLine($"       - {item.Product.Name} x{item.Quantity} @ {item.UnitPrice:F2} zł");
+}
+
+Console.WriteLine("\n--- UPDATE: Zmiana statusu New → Processing ---");
+var orderToUpdate = await db.Orders.FirstAsync(o => o.Status == OrderStatus.New);
+var oldStatus     = orderToUpdate.Status;
+orderToUpdate.Status = OrderStatus.Processing;
+orderToUpdate.Notes  = "Zaktualizowane przez Lab 4";
+await db.SaveChangesAsync();
+Console.WriteLine($"Zamówienie #{orderToUpdate.Id}: {oldStatus} → {orderToUpdate.Status}");
+
+Console.WriteLine("\n--- DELETE: Usunięcie zamówienia Cancelled ---");
+var cancelledOrder = await db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Status == OrderStatus.Cancelled);
+if (cancelledOrder is not null)
+{
+    db.Orders.Remove(cancelledOrder);
+    await db.SaveChangesAsync();
+    Console.WriteLine($"Usunięto zamówienie #{cancelledOrder.Id}");
+}
+else
+    Console.WriteLine("Brak zamówień o statusie Cancelled.");
+
+Console.WriteLine("\n--- DELETE (Restrict): Próba usunięcia klienta z zamówieniami ---");
+var customerWithOrders = await db.Customers.Include(c => c.Orders).FirstAsync(c => c.Orders.Any());
+try
+{
+    db.Customers.Remove(customerWithOrders);
+    await db.SaveChangesAsync();
+}
+catch (Exception ex)
+{
+    db.ChangeTracker.Clear();
+    Console.WriteLine($"Wyjątek (oczekiwany): {ex.GetType().Name} → DeleteBehavior.Restrict działa.");
+}
+
+PrintHeader("LAB 4 / Zadanie 3 — Zapytania LINQ + transakcja");
+
+Console.WriteLine("\n--- Q1: VIP orders > 1000 zł ---");
+decimal threshold = 1000m;
+var vipHighOrders = (await db.Orders.Include(o => o.Customer).Include(o => o.Items)
+    .Where(o => o.Customer.IsVip).ToListAsync())
+    .Where(o => o.Items.Sum(i => i.Quantity * i.UnitPrice) > threshold).ToList();
+foreach (var o in vipHighOrders)
+    Console.WriteLine($"  #{o.Id} | {o.Customer.FullName} [VIP] | {o.Items.Sum(i => i.Quantity * i.UnitPrice):F2} zł");
+if (!vipHighOrders.Any()) Console.WriteLine("  (brak wyników)");
+
+Console.WriteLine("\n--- Q2: Ranking klientów ---");
+var customerRanking = await db.Customers
+    .Select(c => new
+    {
+        c.FullName, c.IsVip,
+        TotalValue = c.Orders.SelectMany(o => o.Items).Sum(i => (decimal?)i.Quantity * i.UnitPrice) ?? 0m,
+        OrderCount = c.Orders.Count()
+    })
+    .OrderByDescending(x => x.TotalValue).ToListAsync();
+foreach (var item in customerRanking)
+    Console.WriteLine($"  {item.FullName}{(item.IsVip ? " [VIP]" : "")}: {item.OrderCount} zamówień, {item.TotalValue:F2} zł");
+
+Console.WriteLine("\n--- Q3: Średnia per miasto ---");
+var avgByCityList = await db.Orders.Include(o => o.Customer).Include(o => o.Items).ToListAsync();
+var avgByCityResult = avgByCityList
+    .GroupBy(o => o.Customer.City)
+    .Select(g => new { City = g.Key, AvgValue = g.Average(o => o.Items.Sum(i => i.Quantity * i.UnitPrice)) })
+    .OrderByDescending(x => x.AvgValue);
+foreach (var item in avgByCityResult)
+    Console.WriteLine($"  {item.City}: średnia {item.AvgValue:F2} zł");
+
+Console.WriteLine("\n--- Q4: Produkty nigdy nie zamówione ---");
+var neverOrdered = await db.Products.Where(p => !p.OrderItems.Any()).ToListAsync();
+if (neverOrdered.Any())
+    foreach (var p in neverOrdered)
+        Console.WriteLine($"  {p.Name} — nigdy nie zamówiony");
+else
+    Console.WriteLine("  Wszystkie produkty były zamówione.");
+
+Console.WriteLine("\n--- Q5: Dynamiczny filtr ---");
+OrderStatus? filterStatus    = OrderStatus.Processing;
+decimal      filterMinAmount = 500m;
+IQueryable<Order> dynamicQuery = db.Orders.Include(o => o.Customer).Include(o => o.Items);
+if (filterStatus.HasValue)
+    dynamicQuery = dynamicQuery.Where(o => o.Status == filterStatus.Value);
+var dynamicResult = (await dynamicQuery.ToListAsync())
+    .Where(o => o.Items.Sum(i => i.Quantity * i.UnitPrice) >= filterMinAmount).ToList();
+Console.WriteLine($"  Wyników: {dynamicResult.Count}");
+foreach (var o in dynamicResult)
+    Console.WriteLine($"  #{o.Id} | {o.Customer.FullName} | {o.Items.Sum(i => i.Quantity * i.UnitPrice):F2} zł");
+
+PrintHeader("LAB 4 / Zadanie 3 — Transakcja");
+
+var orderForSuccess = await db.Orders
+    .Include(o => o.Items).ThenInclude(i => i.Product)
+    .FirstOrDefaultAsync(o => o.Status == OrderStatus.New && o.Items.All(i => i.Product.StockQuantity >= i.Quantity));
+if (orderForSuccess is not null)
+{
+    Console.WriteLine($"\n[SUKCES] Procesowanie zamówienia #{orderForSuccess.Id}...");
+    await ProcessOrderAsync(db, orderForSuccess.Id);
+}
+
+Console.WriteLine("\n[BŁĄD] Scenariusz z niewystarczającym stociem...");
+var productToZero = await db.Products.FirstAsync();
+productToZero.StockQuantity = 0;
+await db.SaveChangesAsync();
+
+var failOrder = new Order
+{
+    CustomerId = firstCustomer.Id,
+    OrderDate  = DateTime.Now,
+    Status     = OrderStatus.New,
+    Items      = [ new OrderItem { ProductId = productToZero.Id, Quantity = 1, UnitPrice = productToZero.Price } ]
+};
+db.Orders.Add(failOrder);
+await db.SaveChangesAsync();
+
+try { await ProcessOrderAsync(db, failOrder.Id); }
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"Wyjątek (oczekiwany): {ex.Message}");
+    Console.WriteLine("→ Rollback wykonany.");
+}
+
+PrintHeader("LAB 4 — koniec demonstracji");
+
+// ============================================================================
+// LAB 5 — CurrencyService
+// ============================================================================
+PrintHeader("LAB 5 - Integracja z NBP API (CurrencyService)");
+
+var httpClient      = new HttpClient();
+var currencyService = new CurrencyService(httpClient);
+var converter       = new OrderCurrencyConverter(currencyService);
+
+await using var dbForCurrency = new OrderFlowContext();
+await dbForCurrency.Database.MigrateAsync();
+
+var ordersForCurrency = await dbForCurrency.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items)
+    .Take(3)
+    .ToListAsync();
+
+if (!ordersForCurrency.Any())
+{
+    Console.WriteLine("Brak zamówień w bazie.");
+}
+else
+{
+    Console.WriteLine($"\n{"#",-4} {"Klient",-20} {"PLN",10} {"USD",10} {"EUR",10}");
+    Console.WriteLine(new string('-', 58));
+    foreach (var o in ordersForCurrency)
+    {
+        var totalPln = o.Items.Sum(i => i.Quantity * i.UnitPrice);
+        decimal? totalUsd = null;
+        decimal? totalEur = null;
+        try { totalUsd = await converter.ConvertOrderTotalAsync(o, "USD"); } catch { }
+        try { totalEur = await converter.ConvertOrderTotalAsync(o, "EUR"); } catch { }
+        Console.WriteLine(
+            $"#{o.Id,-3} {o.Customer?.FullName ?? "?",-20} " +
+            $"{totalPln,9:F2} " +
+            $"{(totalUsd.HasValue ? totalUsd.Value.ToString("F2") : "błąd"),9} " +
+            $"{(totalEur.HasValue ? totalEur.Value.ToString("F2") : "błąd"),9}");
+    }
+}
+
+PrintHeader("OrderFlow — koniec wszystkich labów");
 
 // ============================================================================
 // FUNKCJE POMOCNICZE
@@ -308,343 +472,71 @@ static void RebindCustomers(List<Order> loadedOrders, List<Customer> customerCat
 static List<Order> BuildInboxOrders(List<Product> products, List<Customer> customers, int batchNo)
 {
     var baseOrderId = 10_000 + (batchNo * 100);
-    var seedOrder = SampleData.GetOrders(products, customers).First();
-
-    var result = new List<Order>();
+    var seedOrder   = SampleData.GetOrders(products, customers).First();
+    var result      = new List<Order>();
     for (var i = 0; i < 3; i++)
     {
-        var orderId = baseOrderId + i;
+        var orderId  = baseOrderId + i;
         var customer = customers[(batchNo + i) % customers.Count];
-        var product = products[(batchNo + i) % products.Count];
+        var product  = products[(batchNo + i) % products.Count];
         result.Add(new Order
         {
-            Id = orderId,
+            Id         = orderId,
             CustomerId = customer.Id,
-            Customer = customer,
-            OrderDate = DateTime.Now,
-            Status = OrderStatus.New,
-            Notes = $"Inbox batch {batchNo}, order {i + 1}",
-            Items = new List<OrderItem>
+            Customer   = customer,
+            OrderDate  = DateTime.Now,
+            Status     = OrderStatus.New,
+            Notes      = $"Inbox batch {batchNo}, order {i + 1}",
+            Items      = new List<OrderItem>
             {
                 new OrderItem
                 {
-                    Id = seedOrder.Items.First().Id + orderId,
-                    OrderId = orderId,
+                    Id        = seedOrder.Items.First().Id + orderId,
+                    OrderId   = orderId,
                     ProductId = product.Id,
-                    Product = product,
-                    Quantity = i + 1,
+                    Product   = product,
+                    Quantity  = i + 1,
                     UnitPrice = product.Price
                 }
             }
         });
     }
-
     return result;
 }
-PrintHeader("Projekt OrderFlow - koniec (Lab 1 + Lab 2: zdarzenia, async, thread safety)");
-// ============================================================================
-// LAB 4 — EF Core: seeding, CRUD, zapytania LINQ, transakcje
-// ============================================================================
-PrintHeader("LAB 4 - Baza danych w OrderFlow (EF Core + SQLite)");
- 
-await using var db = new OrderFlowContext();
- 
-// Migracje + seed
-await db.Database.MigrateAsync();
-await DatabaseSeeder.SeedAsync(db);
- 
-// ============================================================================
-// ZADANIE 2 — CRUD
-// ============================================================================
-PrintHeader("LAB 4 / Zadanie 2 — CRUD");
- 
-// ── CREATE ────────────────────────────────────────────────────────────────────
-Console.WriteLine("\n--- CREATE: Nowe zamówienie z 2 pozycjami ---");
- 
-var firstCustomer = await db.Customers.FirstAsync();
-var firstProduct  = await db.Products.FirstAsync();
-var secondProduct = await db.Products.Skip(1).FirstAsync();
- 
-var newOrder = new Order
-{
-    CustomerId = firstCustomer.Id,
-    OrderDate  = DateTime.Now,
-    Status     = OrderStatus.New,
-    Notes      = "Zamówienie testowe z Lab 4",
-    Items      =
-    [
-        new OrderItem { ProductId = firstProduct.Id,  Quantity = 1, UnitPrice = firstProduct.Price  },
-        new OrderItem { ProductId = secondProduct.Id, Quantity = 2, UnitPrice = secondProduct.Price },
-    ]
-};
- 
-db.Orders.Add(newOrder);
-await db.SaveChangesAsync();
-Console.WriteLine($"Dodano zamówienie #{newOrder.Id} z 2 pozycjami dla klienta '{firstCustomer.FullName}'");
- 
-// ── READ ──────────────────────────────────────────────────────────────────────
-Console.WriteLine("\n--- READ: Zamówienia z Include (Customer + Items.Product) ---");
- 
-var ordersFromDb = await db.Orders
-    .Include(o => o.Customer)
-    .Include(o => o.Items)
-        .ThenInclude(i => i.Product)
-    .OrderBy(o => o.Id)
-    .ToListAsync();
- 
-foreach (var o in ordersFromDb)
-{
-    var total = o.Items.Sum(i => i.Quantity * i.UnitPrice);
-    Console.WriteLine($"  #{o.Id} [{o.Status}] | {o.Customer.FullName} | {o.OrderDate:yyyy-MM-dd} | {total:F2} zł");
-    foreach (var item in o.Items)
-        Console.WriteLine($"       - {item.Product.Name} x{item.Quantity} @ {item.UnitPrice:F2} zł");
-}
- 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
-Console.WriteLine("\n--- UPDATE: Zmiana statusu New → Processing + aktualizacja Notes ---");
- 
-var orderToUpdate = await db.Orders.FirstAsync(o => o.Status == OrderStatus.New);
-var oldStatus = orderToUpdate.Status;
-orderToUpdate.Status = OrderStatus.Processing;
-orderToUpdate.Notes  = "Zaktualizowane przez Lab 4 — w trakcie realizacji";
-await db.SaveChangesAsync();
-Console.WriteLine($"Zamówienie #{orderToUpdate.Id}: {oldStatus} → {orderToUpdate.Status} | Notes: \"{orderToUpdate.Notes}\"");
- 
-// ── DELETE ────────────────────────────────────────────────────────────────────
-Console.WriteLine("\n--- DELETE: Usunięcie zamówienia o statusie Cancelled ---");
- 
-var cancelledOrder = await db.Orders
-    .Include(o => o.Items)
-    .FirstOrDefaultAsync(o => o.Status == OrderStatus.Cancelled);
- 
-if (cancelledOrder is not null)
-{
-    db.Orders.Remove(cancelledOrder);
-    await db.SaveChangesAsync();
-    Console.WriteLine($"Usunięto zamówienie #{cancelledOrder.Id} (było: {OrderStatus.Cancelled})");
-}
-else
-{
-    Console.WriteLine("Brak zamówień o statusie Cancelled — nic nie usunięto.");
-}
- 
-// Demonstracja DeleteBehavior.Restrict
-Console.WriteLine("\n--- DELETE (Restrict): Próba usunięcia klienta z zamówieniami ---");
-var customerWithOrders = await db.Customers
-    .Include(c => c.Orders)
-    .FirstAsync(c => c.Orders.Any());
-try
-{
-    db.Customers.Remove(customerWithOrders);
-    await db.SaveChangesAsync();
-    Console.WriteLine("Klient usunięty (nieoczekiwane!)");
-}
-catch (Exception ex)
-{
-    // Cofnij zmianę w change trackerze, by kontynuować demo
-    db.ChangeTracker.Clear();
-    Console.WriteLine($"Wyjątek (zgodnie z oczekiwaniem): {ex.GetType().Name}");
-    Console.WriteLine("  → DeleteBehavior.Restrict działa poprawnie.");
-}
- 
-// ============================================================================
-// ZADANIE 3 — Zapytania LINQ na IQueryable + transakcja
-// ============================================================================
-PrintHeader("LAB 4 / Zadanie 3 — Zapytania LINQ + transakcja");
- 
-// ── ZAPYTANIE 1: Zamówienia klientów VIP z kwotą powyżej progu ──────────────
-Console.WriteLine("\n--- Q1: Zamówienia klientów VIP (kwota > 1000 zł) ---");
- 
-decimal threshold = 1000m;
- 
-var vipHighOrders = await db.Orders
-    .Include(o => o.Customer)
-    .Include(o => o.Items)
-    .Where(o => o.Customer.IsVip)
-    .ToListAsync(); // materialization po stronie C#, bo TotalAmount to computed prop
- 
-var vipHighFiltered = vipHighOrders
-    .Where(o => o.Items.Sum(i => i.Quantity * i.UnitPrice) > threshold)
-    .ToList();
- 
-foreach (var o in vipHighFiltered)
-{
-    var total = o.Items.Sum(i => i.Quantity * i.UnitPrice);
-    Console.WriteLine($"  #{o.Id} | {o.Customer.FullName} [VIP] | {total:F2} zł | {o.Status}");
-}
-if (!vipHighFiltered.Any()) Console.WriteLine("  (brak wyników)");
- 
-// ── ZAPYTANIE 2: Ranking klientów wg łącznej wartości zamówień ───────────────
-Console.WriteLine("\n--- Q2: Ranking klientów wg łącznej wartości zamówień ---");
- 
-var customerRanking = await db.Customers
-    .Select(c => new
-    {
-        c.FullName,
-        c.IsVip,
-        TotalValue = c.Orders
-            .SelectMany(o => o.Items)
-            .Sum(i => (decimal?)i.Quantity * i.UnitPrice) ?? 0m,
-        OrderCount = c.Orders.Count()
-    })
-    .OrderByDescending(x => x.TotalValue)
-    .ToListAsync();
- 
-foreach (var item in customerRanking)
-    Console.WriteLine($"  {item.FullName}{(item.IsVip ? " [VIP]" : "")}: {item.OrderCount} zamówień, razem {item.TotalValue:F2} zł");
- 
-// ── ZAPYTANIE 3: Średnia wartość zamówienia per miasto klienta ───────────────
-Console.WriteLine("\n--- Q3: Średnia wartość zamówienia per miasto ---");
- 
-var avgByCity = await db.Orders
-    .Include(o => o.Customer)
-    .Include(o => o.Items)
-    .ToListAsync();
- 
-var avgByCityResult = avgByCity
-    .GroupBy(o => o.Customer.City)
-    .Select(g => new
-    {
-        City    = g.Key,
-        AvgValue = g.Average(o => o.Items.Sum(i => i.Quantity * i.UnitPrice))
-    })
-    .OrderByDescending(x => x.AvgValue);
- 
-foreach (var item in avgByCityResult)
-    Console.WriteLine($"  {item.City}: średnia {item.AvgValue:F2} zł");
- 
-// ── ZAPYTANIE 4: Produkty nigdy nie zamówione (anti-join) ────────────────────
-Console.WriteLine("\n--- Q4: Produkty nigdy nie zamówione ---");
- 
-var neverOrdered = await db.Products
-    .Where(p => !p.OrderItems.Any())
-    .ToListAsync();
- 
-if (neverOrdered.Any())
-    foreach (var p in neverOrdered)
-        Console.WriteLine($"  {p.Name} ({p.Category}) — nigdy nie zamówiony");
-else
-    Console.WriteLine("  Wszystkie produkty były przynajmniej raz zamówione.");
- 
-// ── ZAPYTANIE 5: Dynamiczny filtr (opcjonalny status + minimalna kwota) ───────
-Console.WriteLine("\n--- Q5: Dynamiczne zapytanie (status=Processing, minKwota=500 zł) ---");
- 
-OrderStatus? filterStatus = OrderStatus.Processing;
-decimal      filterMinAmount = 500m;
- 
-IQueryable<Order> dynamicQuery = db.Orders
-    .Include(o => o.Customer)
-    .Include(o => o.Items);
- 
-if (filterStatus.HasValue)
-    dynamicQuery = dynamicQuery.Where(o => o.Status == filterStatus.Value);
- 
-// materialization konieczna bo TotalAmount to computed prop
-var dynamicResult = (await dynamicQuery.ToListAsync())
-    .Where(o => o.Items.Sum(i => i.Quantity * i.UnitPrice) >= filterMinAmount)
-    .ToList();
- 
-Console.WriteLine($"  Filtry: Status={filterStatus}, MinKwota={filterMinAmount} zł → {dynamicResult.Count} wyników");
-foreach (var o in dynamicResult)
-{
-    var total = o.Items.Sum(i => i.Quantity * i.UnitPrice);
-    Console.WriteLine($"  #{o.Id} | {o.Customer.FullName} | {o.Status} | {total:F2} zł");
-}
- 
-// ── TRANSAKCJA: ProcessOrderAsync ────────────────────────────────────────────
-PrintHeader("LAB 4 / Zadanie 3 — Transakcja ProcessOrderAsync");
- 
-// Scenariusz SUKCESU — zamówienie ze stock > 0
-var orderForSuccess = await db.Orders
-    .Include(o => o.Items)
-    .ThenInclude(i => i.Product)
-    .FirstOrDefaultAsync(o => o.Status == OrderStatus.New
-        && o.Items.All(i => i.Product.StockQuantity >= i.Quantity));
- 
-if (orderForSuccess is not null)
-{
-    Console.WriteLine($"\n[SUKCES] Procesowanie zamówienia #{orderForSuccess.Id}...");
-    await ProcessOrderAsync(db, orderForSuccess.Id);
-}
-else
-{
-    Console.WriteLine("\n[INFO] Brak zamówienia New z wystarczającym stociem dla scenariusza sukcesu.");
-}
- 
-// Scenariusz NIEPOWODZENIA — ustawiamy stock=0 dla produktu i próbujemy
-Console.WriteLine("\n[BŁĄD] Scenariusz z niewystarczającym stociem...");
-var productToZero = await db.Products.FirstAsync();
-productToZero.StockQuantity = 0;
-await db.SaveChangesAsync();
- 
-// Nowe zamówienie na produkt z stock=0
-var failOrder = new Order
-{
-    CustomerId = firstCustomer.Id,
-    OrderDate  = DateTime.Now,
-    Status     = OrderStatus.New,
-    Notes      = "Test — brak stanu magazynowego",
-    Items      = [ new OrderItem { ProductId = productToZero.Id, Quantity = 1, UnitPrice = productToZero.Price } ]
-};
-db.Orders.Add(failOrder);
-await db.SaveChangesAsync();
- 
-try
-{
-    await ProcessOrderAsync(db, failOrder.Id);
-}
-catch (InvalidOperationException ex)
-{
-    Console.WriteLine($"Wyjątek (oczekiwany): {ex.Message}");
-    Console.WriteLine("→ Rollback wykonany, zamówienie pozostało w statusie New.");
-}
- 
-PrintHeader("LAB 4 — koniec demonstracji");
- 
-// ============================================================================
-// METODA: ProcessOrderAsync
-// ============================================================================
+
 static async Task ProcessOrderAsync(OrderFlowContext db, int orderId)
 {
     await using var transaction = await db.Database.BeginTransactionAsync();
     try
     {
         var order = await db.Orders
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
+            .Include(o => o.Items).ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException($"Zamówienie #{orderId} nie istnieje.");
- 
-        // Krok 1: New → Processing
+
         order.Status = OrderStatus.Processing;
         await db.SaveChangesAsync();
         Console.WriteLine($"  [{orderId}] Status: New → Processing");
- 
-        // Krok 2: Sprawdź stany i zmniejsz
+
         foreach (var item in order.Items)
         {
             if (item.Product.StockQuantity < item.Quantity)
                 throw new InvalidOperationException(
-                    $"Brak stanu magazynowego dla '{item.Product.Name}': " +
-                    $"potrzeba {item.Quantity}, dostępne {item.Product.StockQuantity}.");
- 
+                    $"Brak stanu dla '{item.Product.Name}': potrzeba {item.Quantity}, dostępne {item.Product.StockQuantity}.");
             item.Product.StockQuantity -= item.Quantity;
             Console.WriteLine($"  [{orderId}] Stock '{item.Product.Name}': -{item.Quantity} (pozostało: {item.Product.StockQuantity})");
         }
- 
-        // Krok 3: Processing → Completed
+
         order.Status = OrderStatus.Completed;
         await db.SaveChangesAsync();
- 
         await transaction.CommitAsync();
-        Console.WriteLine($"  [{orderId}] Status: Processing → Completed — COMMIT OK");
+        Console.WriteLine($"  [{orderId}] COMMIT OK → Completed");
     }
     catch
     {
         await transaction.RollbackAsync();
         db.ChangeTracker.Clear();
-        Console.WriteLine($"  [{orderId}] ROLLBACK — transakcja cofnięta.");
+        Console.WriteLine($"  [{orderId}] ROLLBACK");
         throw;
     }
 }
- 
